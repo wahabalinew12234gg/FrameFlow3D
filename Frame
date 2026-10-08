@@ -1,0 +1,62 @@
+name: Build FrameFlow 3D APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download repository
+        uses: actions/checkout@v4
+
+      - name: Find project ZIP
+        run: |
+          ZIP=$(find . -maxdepth 2 -name "*.zip" | head -1)
+          echo "ZIP=$ZIP"
+
+          if [ -z "$ZIP" ]; then
+            echo "No project ZIP found!"
+            exit 1
+          fi
+
+          unzip -o "$ZIP" -d extracted
+
+      - name: Locate Android project
+        run: |
+          PROJECT=$(find extracted -name settings.gradle -o -name settings.gradle.kts | head -1 | xargs dirname)
+          echo "PROJECT=$PROJECT" >> $GITHUB_ENV
+          echo "Android project: $PROJECT"
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        working-directory: ${{ env.PROJECT }}
+        run: gradle assembleDebug --no-daemon
+
+      - name: Find APK
+        run: |
+          find "${{ env.PROJECT }}" -name "*.apk" -print
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FrameFlow3D-debug-apk
+          path: '**/build/outputs/apk/**/*.apk'
+          if-no-files-found: error
